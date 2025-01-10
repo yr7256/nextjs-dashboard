@@ -4,6 +4,8 @@ import { z } from "zod";
 import { sql } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { signIn } from "@/auth";
+import { AuthError } from "next-auth";
 
 const FormSchema = z.object({
   id: z.string(),
@@ -31,11 +33,11 @@ export type State = {
   message?: string | null;
 };
 
-export async function createInvoice(prevState: State, formdata: FormData) {
+export async function createInvoice(prevState: State, formData: FormData) {
   const validatedFields = CreateInvoice.safeParse({
-    customerId: formdata.get("customerId"),
-    amount: formdata.get("amount"),
-    status: formdata.get("status"),
+    customerId: formData.get("customerId"),
+    amount: formData.get("amount"),
+    status: formData.get("status"),
   });
 
   if (!validatedFields.success) {
@@ -55,7 +57,7 @@ export async function createInvoice(prevState: State, formdata: FormData) {
     VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
     `;
   } catch (error) {
-    console.error('Database Error:', error);
+    console.error("Database Error:", error);
     return { message: "Database Error: Failed to Create Invoice" };
   }
 
@@ -66,12 +68,12 @@ export async function createInvoice(prevState: State, formdata: FormData) {
 export async function updateInvoice(
   id: string,
   prevState: State,
-  formdata: FormData
+  formData: FormData
 ) {
   const validatedFields = UpdateInvoice.safeParse({
-    customerId: formdata.get("customerId"),
-    amount: formdata.get("amount"),
-    status: formdata.get("status"),
+    customerId: formData.get("customerId"),
+    amount: formData.get("amount"),
+    status: formData.get("status"),
   });
 
   if (!validatedFields.success) {
@@ -90,7 +92,7 @@ export async function updateInvoice(
       WHERE id = ${id}
     `;
   } catch (error) {
-    console.error('Database Error:', error);
+    console.error("Database Error:", error);
     return { message: "Database Error: Failed to Update Invoice" };
   }
 
@@ -105,7 +107,26 @@ export async function deleteInvoice(id: string) {
     revalidatePath("/dashboard/invoices");
     return { message: "Deleted Invoice." };
   } catch (error) {
-    console.error('Database Error:', error);
+    console.error("Database Error:", error);
     return { message: "Database Error: Failed to Delete Invoice" };
+  }
+}
+
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData
+) {
+  try {
+    await signIn("credentials", formData);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case "CredentialsSignin":
+          return "Invalid credentials.";
+        default:
+          return "Something went wrong.";
+      }
+    }
+    throw error;
   }
 }
